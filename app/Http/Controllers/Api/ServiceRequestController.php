@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreServiceRequest;
 use App\Http\Resources\ServiceRequestResource;
-use App\Models\ServiceRequest;
+use App\Models\git ;
 use App\Models\Service;
 use App\Models\Location;
 use Illuminate\Support\Str;
