@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "80:80"
+    volumes:
+      - .:/var/www/html
+      - ./storage:/var/www/html/storage
+    depends_on:
+      - db
+      - redis
+    environment:
+      - DB_HOST=db
+      - DB_DATABASE=laravel
+      - DB_USERNAME=laravel
+      - DB_PASSWORD=laravel_password
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    networks:
+      - laravel-network
+
+  db:
+    image: mysql:8.0
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: laravel
+      MYSQL_USER: laravel
+      MYSQL_PASSWORD: laravel_password
+      MYSQL_ROOT_PASSWORD: root_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - laravel-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - laravel-network
+
+volumes:
+  mysql_data:
+  redis_data:
+
+networks:
+  laravel-network:
+    driver: bridge 
