@@ -4,7 +4,7 @@ services:
   app:
     build: .
     ports:
-      - "80:80"
+      - "8091:80"
     volumes:
       - .:/var/www/html
       - ./storage:/var/www/html/storage
@@ -22,7 +22,7 @@ services:
       - laravel-network
 
   db:
-    image: mysql:8.0
+    image: mysql:5.7
     ports:
       - "3306:3306"
     environment:
