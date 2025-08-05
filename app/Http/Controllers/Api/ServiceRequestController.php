@@ -7,6 +7,7 @@ use App\Http\Requests\StoreServiceRequest;
 use App\Http\Resources\ServiceRequestResource;
 use App\Models\ServiceRequest;
 use App\Models\Service;
+use App\Models\Location;
 use Illuminate\Support\Str;
 
 class ServiceRequestController extends Controller
@@ -27,7 +28,7 @@ class ServiceRequestController extends Controller
     {
         $service = Service::findOrFail($request->service_id);
 
-        $totalPrice = $service->base_price; // Add dynamic pricing logic here if needed
+        $totalPrice = $service->base_price; 
 
         if ($request->location) {
             $location = Location::create([
