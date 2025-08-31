@@ -10,8 +10,27 @@ class Payment extends Model {
         'service_request_id', 'method', 'amount', 'status', 'invoice_number'
     ];
 
+    protected $casts = [
+        'amount' => 'decimal:2',
+    ];
+
     public function serviceRequest(): BelongsTo
     {
         return $this->belongsTo(ServiceRequest::class);
+    }
+
+    public function isPaid(): bool
+    {
+        return $this->status === 'paid';
+    }
+
+    public function isPending(): bool
+    {
+        return $this->status === 'pending';
+    }
+
+    public function isFailed(): bool
+    {
+        return $this->status === 'failed';
     }
 }
