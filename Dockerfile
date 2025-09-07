@@ -18,6 +18,9 @@ RUN a2enmod rewrite
 # Set working directory
 WORKDIR /var/www/html
 
+# Copy application files first (this includes the artisan file)
+COPY . .
+
 # Copy composer files
 COPY composer.json composer.lock ./
 
@@ -26,9 +29,6 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader --no-interaction
-
-# Copy application files
-COPY . .
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html \
@@ -45,4 +45,4 @@ RUN if [ ! -f .env ]; then cp .env.example .env; fi
 EXPOSE 80
 
 # Start Apache
-CMD ["apache2-foreground"] 
+CMD ["apache2-foreground"]

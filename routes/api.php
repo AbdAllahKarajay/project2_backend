@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\WalletController;
 use App\Http\Controllers\Api\LoyaltyController;
 use App\Http\Controllers\Api\Admin\WalletManagementController;
+use App\Http\Controllers\Api\ReviewController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -39,6 +40,13 @@ Route::middleware('auth:sanctum')->group(function () {
     
     Route::get('/services', [ServiceController::class, 'index']);
     Route::get('/services/{id}', [ServiceController::class, 'show']);
+    
+    // Reviews
+    Route::get('/services/{serviceId}/reviews', [ReviewController::class, 'index']);
+    Route::get('/services/{serviceId}/reviews/summary', [ReviewController::class, 'summary']);
+    Route::post('/services/{serviceId}/reviews', [ReviewController::class, 'store']);
+    Route::post('/reviews/{reviewId}', [ReviewController::class, 'update']);
+    Route::post('/reviews/{reviewId}/delete', [ReviewController::class, 'destroy']);
     
     // Service Request (Bookings) routes
     Route::post('/bookings', [ServiceRequestController::class, 'store']);
