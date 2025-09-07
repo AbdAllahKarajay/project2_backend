@@ -22,10 +22,11 @@ RUN apt-get update && apt-get install -y \
     vim \
     supervisor \
     nginx \
+    libicu-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install PHP extensions
+# Install PHP extensions, including intl
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
     pdo_mysql \
@@ -34,7 +35,8 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     pcntl \
     bcmath \
     gd \
-    zip
+    zip \
+    intl
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
