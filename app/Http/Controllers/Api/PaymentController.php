@@ -18,29 +18,42 @@ class PaymentController extends Controller
             'service_request_id' => 'required|exists:service_requests,id',
             'method' => 'required|in:cash,wallet,third_party',
         ]);
-
+    
+        $idempotencyKey = $request->header('Idempotency-Key');
+    
+        if (!$idempotencyKey) {
+            return response()->json(['message' => 'Idempotency-Key header is required.'], 400);
+        }
+    
+        // Check if a payment with this idempotency key already exists
+        if ($existing = Payment::where('idempotency_key', $idempotencyKey)->first()) {
+            return response()->json([
+                'message' => 'Payment already processed.',
+                'data' => $existing
+            ]);
+        }
+    
         $serviceRequest = ServiceRequest::where('user_id', auth()->id())->findOrFail($request->service_request_id);
-
+    
         if ($serviceRequest->status !== 'pending') {
             return response()->json(['message' => 'This booking is already paid or in progress.'], 400);
         }
-
+    
         $user = $request->user();
         $amount = $serviceRequest->total_price;
-
+    
         try {
             DB::beginTransaction();
-
+            DB::statement('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+    
             if ($request->method === 'wallet') {
                 if (!$user->hasSufficientBalance($amount)) {
                     return response()->json(['message' => 'Insufficient wallet balance.'], 400);
                 }
-
-                // Deduct from wallet
+    
                 $balanceBefore = $user->wallet_balance;
                 $user->deductFromWallet($amount);
-
-                // Create wallet transaction for payment
+    
                 WalletTransaction::create([
                     'user_id' => $user->id,
                     'type' => 'payment',
@@ -57,22 +70,23 @@ class PaymentController extends Controller
                     'status' => 'completed',
                 ]);
             }
-
+    
             $invoiceNumber = strtoupper(Str::random(10));
-
+    
             $payment = Payment::create([
                 'service_request_id' => $serviceRequest->id,
                 'method' => $request->method,
                 'amount' => $amount,
                 'status' => 'paid',
-                'invoice_number' => $invoiceNumber
+                'invoice_number' => $invoiceNumber,
+                'idempotency_key' => $idempotencyKey, // must add this column in payments table
             ]);
-
+    
             $serviceRequest->status = 'in_progress';
             $serviceRequest->save();
-
+    
             DB::commit();
-
+    
             return response()->json([
                 'message' => 'Payment successful.',
                 'data' => [
@@ -82,56 +96,66 @@ class PaymentController extends Controller
                     'wallet_balance' => $request->method === 'wallet' ? $user->wallet_balance : null,
                 ]
             ]);
-
+    
         } catch (\Exception $e) {
             DB::rollBack();
-            
-            return response()->json([
-                'message' => 'Payment failed. Please try again.',
-            ], 500);
+            return response()->json(['message' => 'Payment failed. Please try again.'], 500);
         }
     }
-
-    /**
-     * Process refund for a service request.
-     */
+    
     public function refund(Request $request, $paymentId)
     {
         $request->validate([
             'reason' => 'required|string|max:500',
             'refund_amount' => 'nullable|numeric|min:0.01',
         ]);
-
+    
+        $idempotencyKey = $request->header('Idempotency-Key');
+        if (!$idempotencyKey) {
+            return response()->json(['message' => 'Idempotency-Key header is required.'], 400);
+        }
+    
+        // Check if refund with this idempotency key already exists
+        if ($existing = WalletTransaction::where('reference', 'SERVICE_REFUND')
+            ->where('metadata->idempotency_key', $idempotencyKey)
+            ->first()) {
+            return response()->json([
+                'message' => 'Refund already processed.',
+                'data' => $existing
+            ]);
+        }
+    
         $payment = Payment::with('serviceRequest.user')
             ->whereHas('serviceRequest', function ($query) {
                 $query->where('user_id', auth()->id());
             })
             ->findOrFail($paymentId);
-
+    
         if ($payment->status !== 'paid') {
             return response()->json(['message' => 'This payment cannot be refunded.'], 400);
         }
-
+    
         $refundAmount = $request->refund_amount ?? $payment->amount;
-        
         if ($refundAmount > $payment->amount) {
             return response()->json(['message' => 'Refund amount cannot exceed payment amount.'], 400);
         }
-
+    
         try {
             DB::beginTransaction();
-
+            DB::statement('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+    
             // Update payment status
-            $payment->update(['status' => 'refunded']);
-
-            // If payment was made with wallet, refund to wallet
+            $payment->update([
+                'status' => 'refunded',
+                'idempotency_key' => $idempotencyKey, // save key on payment too
+            ]);
+    
             if ($payment->method === 'wallet') {
                 $user = $payment->serviceRequest->user;
                 $balanceBefore = $user->wallet_balance;
-                
+    
                 $user->addToWallet($refundAmount);
-
-                // Create wallet transaction for refund
+    
                 WalletTransaction::create([
                     'user_id' => $user->id,
                     'type' => 'refund',
@@ -145,30 +169,33 @@ class PaymentController extends Controller
                         'service_request_id' => $payment->serviceRequest->id,
                         'refund_reason' => $request->reason,
                         'original_amount' => $payment->amount,
+                        'idempotency_key' => $idempotencyKey, // ✅ stored for safety
                     ],
                     'status' => 'completed',
                 ]);
             }
-
+    
             DB::commit();
-
+    
             return response()->json([
                 'message' => 'Refund processed successfully.',
                 'data' => [
                     'refund_amount' => $refundAmount,
                     'refund_reason' => $request->reason,
-                    'wallet_balance' => $payment->method === 'wallet' ? $payment->serviceRequest->user->wallet_balance : null,
+                    'wallet_balance' => $payment->method === 'wallet'
+                        ? $payment->serviceRequest->user->wallet_balance
+                        : null,
                 ]
             ]);
-
+    
         } catch (\Exception $e) {
             DB::rollBack();
-            
             return response()->json([
                 'message' => 'Refund failed. Please try again.',
             ], 500);
         }
     }
+    
 
     /**
      * Get payment history for the authenticated user.

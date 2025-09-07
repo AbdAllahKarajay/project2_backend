@@ -13,6 +13,7 @@ return new class extends Migration {
             $table->decimal('amount', 10, 2);
             $table->enum('status', ['pending', 'paid', 'failed'])->default('pending');
             $table->string('invoice_number')->unique();
+            $table->string('idempotency_key')->nullable()->unique();
             $table->timestamps();
         });
     }
