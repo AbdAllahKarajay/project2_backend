@@ -35,11 +35,11 @@ RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html/storage \
     && chmod -R 755 /var/www/html/bootstrap/cache
 
-# Generate application key
-RUN php artisan key:generate --force
-
 # Create .env file if it doesn't exist
 RUN if [ ! -f .env ]; then cp .env.example .env; fi
+
+# Generate application key
+RUN php artisan key:generate --force
 
 # Expose port 80
 EXPOSE 80
