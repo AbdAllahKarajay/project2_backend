@@ -1,53 +1,82 @@
-FROM php:8.2-apache
+# Use PHP 8.1 FPM as base image
+FROM php:8.1-fpm
 
-# Set environment variables for Apache runtime
-ENV APACHE_RUN_DIR /var/run/apache2
-ENV APACHE_LOG_DIR /var/log/apache2
-ENV APACHE_PID_FILE /var/run/apache2/apache2.pid
+# Set working directory
+WORKDIR /var/www/html
 
-# Create required directories
-RUN mkdir -p /var/run/apache2 && \
-    chown -R www-data:www-data /var/run/apache2
-
-# Install any necessary dependencies
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     git \
     curl \
     libpng-dev \
     libonig-dev \
     libxml2-dev \
-    libicu-dev \
     zip \
     unzip \
-    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd intl
+    libzip-dev \
+    libfreetype6-dev \
+    libjpeg62-turbo-dev \
+    libmcrypt-dev \
+    libgd-dev \
+    jpegoptim optipng pngquant gifsicle \
+    vim \
+    supervisor \
+    nginx \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# Enable Apache mod_rewrite
-RUN a2enmod rewrite
-
-# Set the working directory
-WORKDIR /var/www/html
-
-# Copy composer files
-COPY composer.json composer.lock ./
-
-# Copy application files
-COPY . .
-
-# Set permissions
-RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 755 /var/www/html/storage \
-    && chmod -R 755 /var/www/html/bootstrap/cache
+# Install PHP extensions
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install -j$(nproc) \
+    pdo_mysql \
+    mbstring \
+    exif \
+    pcntl \
+    bcmath \
+    gd \
+    zip
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+# Install Node.js and npm
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs
 
+# Copy composer files and install dependencies
+COPY composer.json composer.lock ./
+RUN composer install --no-scripts --no-autoloader --no-dev --optimize-autoloader
 
-# Enable site and restart Apache
-RUN a2ensite 000-default.conf
-RUN systemctl restart apache2
+# Copy package.json and install node dependencies
+COPY package.json ./
+RUN npm install
 
-# Expose port 80 for Apache
+# Copy application code
+COPY . .
+
+# Set proper permissions
+RUN chown -R www-data:www-data /var/www/html \
+    && chmod -R 755 /var/www/html \
+    && chmod -R 775 /var/www/html/storage \
+    && chmod -R 775 /var/www/html/bootstrap/cache
+
+# Generate autoloader
+RUN composer dump-autoload --optimize
+
+# Build frontend assets
+RUN npm run build
+
+# Copy Nginx configuration
+COPY docker/nginx/default.conf /etc/nginx/sites-available/default
+
+# Copy supervisor configuration
+COPY docker/supervisor/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Create run directory for PHP-FPM
+RUN mkdir -p /run/php
+
+# Expose port 80
 EXPOSE 80
+
+# Start supervisor
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"] 
