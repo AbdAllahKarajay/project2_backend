@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\WalletTopupRequest;
 use App\Models\WalletTransaction;
+use App\Services\FcmService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -12,6 +13,12 @@ use Illuminate\Support\Facades\DB;
 
 class WalletController extends Controller
 {
+    private FcmService $fcmService;
+
+    public function __construct(FcmService $fcmService)
+    {
+        $this->fcmService = $fcmService;
+    }
     /**
      * Get the authenticated user's wallet balance.
      */
@@ -63,6 +70,15 @@ class WalletController extends Controller
             $user->addToWallet($amount);
 
             DB::commit();
+
+            // Send wallet topup notification
+            if ($user->hasFcmToken()) {
+                $this->fcmService->sendPaymentNotification(
+                    $user,
+                    $amount,
+                    'received'
+                );
+            }
 
             return response()->json([
                 'success' => true,

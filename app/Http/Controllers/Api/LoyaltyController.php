@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\RedeemLoyaltyRewardRequest;
 use App\Models\LoyaltyReward;
 use App\Models\LoyaltyRewardRedemption;
+use App\Services\FcmService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,6 +15,12 @@ use Carbon\Carbon;
 
 class LoyaltyController extends Controller
 {
+    private FcmService $fcmService;
+
+    public function __construct(FcmService $fcmService)
+    {
+        $this->fcmService = $fcmService;
+    }
     /**
      * Get the authenticated user's loyalty points.
      */
@@ -146,6 +153,15 @@ class LoyaltyController extends Controller
             $reward->incrementRedemptions();
 
             DB::commit();
+
+            // Send loyalty points notification
+            if ($user->hasFcmToken()) {
+                $this->fcmService->sendLoyaltyPointsNotification(
+                    $user,
+                    -$reward->points_required,
+                    "Redeemed reward: {$reward->name}"
+                );
+            }
 
             return response()->json([
                 'success' => true,
