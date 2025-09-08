@@ -7,11 +7,18 @@ use Illuminate\Http\Request;
 use App\Models\Payment;
 use App\Models\ServiceRequest;
 use App\Models\WalletTransaction;
+use App\Services\FcmService;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 
 class PaymentController extends Controller
 {
+    private FcmService $fcmService;
+
+    public function __construct(FcmService $fcmService)
+    {
+        $this->fcmService = $fcmService;
+    }
     public function store(Request $request)
     {
         $request->validate([
@@ -44,7 +51,7 @@ class PaymentController extends Controller
     
         try {
             DB::beginTransaction();
-            DB::statement('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+            DB::statement('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
     
             if ($request->method === 'wallet') {
                 if (!$user->hasSufficientBalance($amount)) {
@@ -86,6 +93,15 @@ class PaymentController extends Controller
             $serviceRequest->save();
     
             DB::commit();
+    
+            // Send payment notification to user
+            if ($user->hasFcmToken()) {
+                $this->fcmService->sendPaymentNotification(
+                    $user,
+                    $amount,
+                    'completed'
+                );
+            }
     
             return response()->json([
                 'message' => 'Payment successful.',
@@ -142,7 +158,7 @@ class PaymentController extends Controller
     
         try {
             DB::beginTransaction();
-            DB::statement('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+            DB::statement('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
     
             // Update payment status
             $payment->update([

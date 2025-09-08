@@ -11,7 +11,7 @@ class User extends Authenticatable {
     use HasApiTokens, HasFactory;
 
     protected $fillable = [
-        'name', 'email', 'phone', 'password', 'role', 'wallet_balance'
+        'name', 'email', 'phone', 'password', 'role', 'wallet_balance', 'fcm_token'
     ];
 
     protected $hidden = ['password', 'remember_token'];
@@ -110,5 +110,22 @@ class User extends Authenticatable {
             'points' => -$points,
             'source_request_id' => $sourceRequestId,
         ]);
+    }
+
+    public function updateFcmToken(string $token): bool
+    {
+        $this->fcm_token = $token;
+        return $this->save();
+    }
+
+    public function hasFcmToken(): bool
+    {
+        return !empty($this->fcm_token);
+    }
+
+    public function clearFcmToken(): bool
+    {
+        $this->fcm_token = null;
+        return $this->save();
     }
 }

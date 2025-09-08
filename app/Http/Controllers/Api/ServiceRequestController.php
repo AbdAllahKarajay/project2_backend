@@ -10,11 +10,18 @@ use App\Http\Resources\ServiceRequestResource;
 use App\Models\Service;
 use App\Models\ServiceRequest;
 use App\Models\Location;
+use App\Services\FcmService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
 
 class ServiceRequestController extends Controller
 {
+    private FcmService $fcmService;
+
+    public function __construct(FcmService $fcmService)
+    {
+        $this->fcmService = $fcmService;
+    }
     public function index()
     {
         $requests = ServiceRequest::with('service', 'location')->where('user_id', auth()->id())->latest()->get();
@@ -51,6 +58,16 @@ class ServiceRequestController extends Controller
             'total_price' => $totalPrice,
             'special_instructions' => $request->special_instructions,
         ]);
+
+        // Send notification to user about booking confirmation
+        $user = auth()->user();
+        if ($user && $user->hasFcmToken()) {
+            $this->fcmService->sendServiceRequestUpdate(
+                $user,
+                'confirmed',
+                $service->name
+            );
+        }
 
         return response()->json([
             'message' => 'Service booked successfully.',
@@ -95,6 +112,16 @@ class ServiceRequestController extends Controller
 
         $serviceRequest->update(['status' => 'cancelled']);
 
+        // Send notification to user about cancellation
+        $user = auth()->user();
+        if ($user && $user->hasFcmToken()) {
+            $this->fcmService->sendServiceRequestUpdate(
+                $user,
+                'cancelled',
+                $serviceRequest->service->name
+            );
+        }
+
         return response()->json([
             'message' => 'Booking cancelled successfully.'
         ]);
@@ -116,6 +143,16 @@ class ServiceRequestController extends Controller
             'status' => $newStatus,
             // You could add a notes field to track status change reasons
         ]);
+
+        // Send notification to user about status update
+        $user = auth()->user();
+        if ($user && $user->hasFcmToken()) {
+            $this->fcmService->sendServiceRequestUpdate(
+                $user,
+                $newStatus,
+                $serviceRequest->service->name
+            );
+        }
 
         return response()->json([
             'message' => 'Booking status updated successfully.',

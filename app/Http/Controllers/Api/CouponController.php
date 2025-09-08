@@ -7,9 +7,16 @@ use App\Http\Requests\ApplyCouponRequest;
 use App\Models\Coupon;
 use App\Models\CouponUsage;
 use App\Models\ServiceRequest;
+use App\Services\FcmService;
 
 class CouponController extends Controller
 {
+    private FcmService $fcmService;
+
+    public function __construct(FcmService $fcmService)
+    {
+        $this->fcmService = $fcmService;
+    }
     public function apply(ApplyCouponRequest $request)
     {
         $coupon = Coupon::where('code', $request->code)->firstOrFail();
@@ -40,6 +47,16 @@ class CouponController extends Controller
         $discount = $coupon->type === 'percentage'
             ? ($coupon->value / 100) * $serviceRequest->total_price
             : $coupon->value;
+
+        // Send coupon applied notification
+        $user = auth()->user();
+        if ($user && $user->hasFcmToken()) {
+            $this->fcmService->sendCouponNotification(
+                $user,
+                $coupon->code,
+                "You saved $" . round($discount, 2) . " with this coupon!"
+            );
+        }
 
         return response()->json([
             'message' => 'Coupon applied successfully.',
