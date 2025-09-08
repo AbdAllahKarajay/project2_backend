@@ -4,11 +4,14 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\LoyaltyReward;
+use Faker\Factory as Faker;
 
 class LoyaltyRewardsTableSeeder extends Seeder
 {
     public function run(): void
     {
+        $faker = Faker::create();
+
         $rewards = [
             [
                 'name' => '10% Service Discount',
@@ -35,6 +38,19 @@ class LoyaltyRewardsTableSeeder extends Seeder
                 'current_redemptions' => 0,
                 'valid_from' => now(),
                 'valid_until' => now()->addYear(),
+            ],
+            [
+                'name' => 'Free Window Washing',
+                'description' => 'Redeem for a free window washing add-on',
+                'points_required' => 180,
+                'type' => 'free_service',
+                'value' => null,
+                'code' => 'FREEWINDOW',
+                'is_active' => true,
+                'max_redemptions' => 400,
+                'current_redemptions' => 0,
+                'valid_from' => now(),
+                'valid_until' => now()->addMonths(9),
             ],
             [
                 'name' => 'Premium Upgrade',
@@ -78,7 +94,29 @@ class LoyaltyRewardsTableSeeder extends Seeder
         ];
 
         foreach ($rewards as $reward) {
-            LoyaltyReward::create($reward);
+            LoyaltyReward::updateOrCreate(['code' => $reward['code']], $reward);
+        }
+
+        // Randomized seasonal rewards
+        for ($i = 0; $i < 3; $i++) {
+            $types = ['discount', 'cashback'];
+            $type = $faker->randomElement($types);
+            $value = $type === 'discount' ? $faker->randomFloat(2, 5, 30) : $faker->randomFloat(2, 2, 15);
+            LoyaltyReward::updateOrCreate(
+                ['code' => strtoupper($faker->unique()->bothify('LOY##??'))],
+                [
+                    'name' => ($type === 'discount' ? $value . '% Bonus Discount' : '$' . $value . ' Wallet Bonus'),
+                    'description' => $faker->sentence(10),
+                    'points_required' => $faker->numberBetween(50, 300),
+                    'type' => $type,
+                    'value' => $type === 'discount' ? $value : $value,
+                    'is_active' => true,
+                    'max_redemptions' => $faker->numberBetween(200, 1500),
+                    'current_redemptions' => 0,
+                    'valid_from' => now(),
+                    'valid_until' => now()->addMonths($faker->numberBetween(3, 12)),
+                ]
+            );
         }
     }
 }

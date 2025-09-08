@@ -5,48 +5,58 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use App\Models\Location;
 use App\Models\User;
+use Faker\Factory as Faker;
 
 class LocationsTableSeeder extends Seeder
 {
     public function run(): void
     {
-        // Get existing users
-        $users = User::all();
+        $faker = Faker::create();
 
+        // Get or create users to attach locations
+        $users = User::all();
         if ($users->isEmpty()) {
-            // Create a default user if none exist
-            $user = User::create([
-                'name' => 'Test User',
-                'email' => 'test@example.com',
-                'phone' => '1234567890',
-                'password' => bcrypt('password'),
-                'role' => 'customer',
-                'wallet_balance' => 100.00
+            $users = collect([
+                User::create([
+                    'name' => 'Seeded Customer',
+                    'email' => 'seeded-customer@example.com',
+                    'phone' => '1002003000',
+                    'password' => bcrypt('password'),
+                    'role' => 'customer',
+                    'wallet_balance' => 50.00
+                ])
             ]);
-        } else {
-            $user = $users->first();
         }
 
-        // Create sample locations
-        Location::create([
-            'user_id' => $user->id,
-            'address_text' => '123 Main Street, Downtown, City Center',
-            'latitude' => 40.7128,
-            'longitude' => -74.0060,
-        ]);
+        foreach ($users as $user) {
+            // Each user gets 1-3 locations around a central city coordinate
+            $numLocations = $faker->numberBetween(1, 3);
 
-        Location::create([
-            'user_id' => $user->id,
-            'address_text' => '456 Oak Avenue, Suburb District',
-            'latitude' => 40.7589,
-            'longitude' => -73.9851,
-        ]);
+            // Pick a base coordinate (simulate a few cities)
+            $cities = [
+                ['name' => 'New York', 'lat' => 40.7128, 'lng' => -74.0060],
+                ['name' => 'Los Angeles', 'lat' => 34.0522, 'lng' => -118.2437],
+                ['name' => 'Chicago', 'lat' => 41.8781, 'lng' => -87.6298],
+                ['name' => 'Houston', 'lat' => 29.7604, 'lng' => -95.3698],
+                ['name' => 'Miami', 'lat' => 25.7617, 'lng' => -80.1918],
+            ];
+            $city = $faker->randomElement($cities);
 
-        Location::create([
-            'user_id' => $user->id,
-            'address_text' => '789 Pine Street, Residential Area',
-            'latitude' => 40.7505,
-            'longitude' => -73.9934,
-        ]);
+            for ($i = 0; $i < $numLocations; $i++) {
+                $offsetLat = $faker->randomFloat(4, -0.05, 0.05);
+                $offsetLng = $faker->randomFloat(4, -0.05, 0.05);
+
+                Location::updateOrCreate(
+                    [
+                        'user_id' => $user->id,
+                        'address_text' => $faker->streetAddress() . ', ' . $city['name'],
+                    ],
+                    [
+                        'latitude' => $city['lat'] + $offsetLat,
+                        'longitude' => $city['lng'] + $offsetLng,
+                    ]
+                );
+            }
+        }
     }
 } 
