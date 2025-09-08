@@ -44,7 +44,7 @@ class PaymentController extends Controller
     
         try {
             DB::beginTransaction();
-            DB::statement('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+            DB::statement('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
     
             if ($request->method === 'wallet') {
                 if (!$user->hasSufficientBalance($amount)) {
@@ -142,7 +142,7 @@ class PaymentController extends Controller
     
         try {
             DB::beginTransaction();
-            DB::statement('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+            DB::statement('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
     
             // Update payment status
             $payment->update([
