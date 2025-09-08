@@ -24,7 +24,8 @@ class PaymentController extends Controller
         if (!$idempotencyKey) {
             return response()->json(['message' => 'Idempotency-Key header is required.'], 400);
         }
-    
+        
+        $idempotencyKey .= auth()->id();
         // Check if a payment with this idempotency key already exists
         if ($existing = Payment::where('idempotency_key', $idempotencyKey)->first()) {
             return response()->json([
@@ -114,6 +115,7 @@ class PaymentController extends Controller
         if (!$idempotencyKey) {
             return response()->json(['message' => 'Idempotency-Key header is required.'], 400);
         }
+        $idempotencyKey .= auth()->id();
     
         // Check if refund with this idempotency key already exists
         if ($existing = WalletTransaction::where('reference', 'SERVICE_REFUND')
